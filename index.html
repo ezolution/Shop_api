@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shopee Product Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    #searchBox {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    #searchBox input {
+      width: 300px;
+      padding: 8px;
+      font-size: 16px;
+    }
+    #searchBox button {
+      padding: 8px 12px;
+      margin-left: 10px;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border: 1px solid #ddd;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .loading {
+      text-align: center;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Shopee Products (In-Stock)</h1>
+  <div id="searchBox">
+    <input type="text" id="keywordInput" placeholder="Enter keyword (e.g., Destined Rivals)" />
+    <button onclick="searchProducts()">Search</button>
+  </div>
+  <div class="loading">Waiting for search keyword...</div>
+  <table id="productTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Price (SGD)</th>
+        <th>Sold</th>
+        <th>Stock</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+
+  <script>
+    const shopid = 270785126;
+    const limit = 30;
+    const maxPages = 10;
+
+    async function searchProducts() {
+      const keyword = document.getElementById('keywordInput').value.trim();
+      if (!keyword) {
+        alert('Please enter a keyword!');
+        return;
+      }
+
+      document.querySelector('.loading').textContent = 'Loading products, please wait...';
+      document.querySelector('.loading').style.display = 'block';
+      document.getElementById('productTable').style.display = 'none';
+      const delay = ms => new Promise(res => setTimeout(res, ms));
+
+      let offset = 0;
+      let allItems = [];
+
+      for (let i = 0; i < maxPages; i++) {
+        const url = `https://shopee.sg/api/v4/shop/search_items?item_card_use_scene=search_items_popular&limit=${limit}&offset=${offset}&order=desc&shopid=${shopid}&sort_by=pop&use_case=4`;
+
+        const res = await fetch(url, {
+          headers: {
+            "accept": "application/json",
+            "x-api-source": "pc",
+            "user-agent": navigator.userAgent,
+            "referer": `https://shopee.sg/shop/${shopid}/search`
+          }
+        });
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (items.length === 0) break;
+
+        allItems.push(...items);
+        offset += limit;
+        await delay(1000);
+      }
+
+      const results = allItems.map(p => {
+        const i = p.item_basic;
+        return {
+          Name: i.name,
+          Price: (i.price / 100000).toFixed(2),
+          Sold: i.historical_sold || 0,
+          Stock: i.stock || 0,
+          URL: `https://shopee.sg/product/${i.shopid}/${i.itemid}`
+        };
+      });
+
+      const filteredResults = results.filter(item => item.Name.toLowerCase().includes(keyword.toLowerCase()));
+
+      // Populate table
+      const table = document.getElementById('productTable');
+      const tbody = table.querySelector('tbody');
+      tbody.innerHTML = ''; // clear previous results
+
+      filteredResults.forEach(item => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${item.Name}</td>
+          <td>${item.Price}</td>
+          <td>${item.Sold}</td>
+          <td>${item.Stock}</td>
+          <td><a href="${item.URL}" target="_blank">View</a></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.querySelector('.loading').style.display = 'none';
+      if (filteredResults.length > 0) {
+        table.style.display = 'table';
+      } else {
+        document.querySelector('.loading').textContent = 'No matching products found!';
+      }
+    }
+  </script>
+</body>
+</html>
